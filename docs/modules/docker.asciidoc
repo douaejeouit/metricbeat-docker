@@ -1,0 +1,37 @@
+////
+This file is generated! See scripts/docs_collector.py
+////
+
+[[metricbeat-module-docker]]
+== docker Module
+
+This is the docker Module.
+
+
+
+[float]
+=== Example Configuration
+
+The docker module supports the standard configuration options which can be found
+here <<configuration-metricbeat,here>>. Below is an example of a configuration option:
+
+[source,yaml]
+----
+metricbeat.modules:
+- module: docker
+  metricsets: ["cpu"]
+  enabled: true
+  period: 1s
+  hosts: ["localhost"]
+
+----
+
+[float]
+=== MetricSets
+
+The following MetricSets are available:
+
+* <<metricbeat-metricset-docker-cpu,cpu>>
+
+include::docker/cpu.asciidoc[]
+
