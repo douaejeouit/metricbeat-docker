@@ -12,8 +12,8 @@ This is the docker Module.
 [float]
 === Example Configuration
 
-The docker module supports the standard configuration options which can be found
-here <<configuration-metricbeat,here>>. Below is an example of a configuration option:
+The docker module supports the standard configuration options that are described
+in <<configuration-metricbeat>>. Here is an example configuration:
 
 [source,yaml]
 ----
@@ -27,9 +27,9 @@ metricbeat.modules:
 ----
 
 [float]
-=== MetricSets
+=== Metricsets
 
-The following MetricSets are available:
+The following metricsets are available:
 
 * <<metricbeat-metricset-docker-cpu,cpu>>
 

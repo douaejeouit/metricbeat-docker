@@ -7,7 +7,7 @@ import (
 	"github.com/elastic/beats/metricbeat/beater"
 
 	// Make sure all your modules and metricsets are linked in this file
-	_ "github.com/ingensi/dockerbeat-docker/metricbeat-docker/include"
+	_ "github.com/ingensi/metricbeat-docker/include"
 	// Uncomment the following line to include all official metricbeat module and metricsets
 	//_ "github.com/elastic/beats/metricbeat/include"
 )
