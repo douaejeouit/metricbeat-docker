@@ -3,6 +3,7 @@ package cpu
 import (
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/metricbeat/mb"
+	"github.com/ingensi/metricbeat-docker/module/docker"
 )
 
 // init registers the MetricSet with the central registry.
@@ -19,7 +20,7 @@ func init() {
 // multiple fetch calls.
 type MetricSet struct {
 	mb.BaseMetricSet
-	counter int
+	ds *docker.DockerStats
 }
 
 // New create a new instance of the MetricSet
@@ -35,19 +36,18 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 
 	return &MetricSet{
 		BaseMetricSet: base,
-		counter:       1,
+		ds : docker.New(),
+
 	}, nil
 }
 
 // Fetch methods implements the data gathering and data conversion to the right format
 // It returns the event which is then forward to the output. In case of an error, a
 // descriptive error must be returned.
-func (m *MetricSet) Fetch() (common.MapStr, error) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 
-	event := common.MapStr{
-		"counter": m.counter,
-	}
-	m.counter++
-
-	return event, nil
+// getDOckerSTtat
+	// add err in output of GetDOckerStats,
+	events := m.ds.GetDockerStats()
+	return events, nil
 }
