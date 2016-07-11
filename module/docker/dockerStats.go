@@ -4,15 +4,21 @@ import (
 	"errors"
 	"time"
 	"fmt"
+	"sync"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/ingensi/metricbeat-docker/calculator"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
-)
 
+)
+//var BeatConfig *config.Config
 
 type SocketConfig struct {
 	socket    string
+	enableTls bool
+	caPath    string
+	certPath  string
+	keyPath   string
 }
 
 // check docker config ??
@@ -22,69 +28,98 @@ type DockerStats struct {
 	dockerClient         *docker.Client
 	dataGenerator         DataGenerator
 }
-// TO DO : Add the configuration
 
-
- func New() *DockerStats {
-	 return &DockerStats{}
+// if tls diseable
+ func  CreateDS(pPeriod time.Duration, pSocket string, pEnable bool) *DockerStats {
+	 return &DockerStats{
+		 period: pPeriod,
+		 socketConfig: SocketConfig{
+			 socket: pSocket,
+			 enableTls: pEnable,
+		 },
+	 }
  }
-func (bt *DockerStats) GetDockerClient() (*docker.Client, error) {
-	var client *docker.Client
-	var err error
-	 // TO ADD TO THE CONFIG METHOD
-	/*bt.socketConfig = SocketConfig{
-		socket:    "unix:///var/run/docker.sock",
+
+//if tls enable
+/*func  CreateDSE(pPeriod time.Duration, pSocket string, pEnable bool,
+ 				pCapath string, pCertpath string, pKeypath string){
+
+	tmpDS := CreateDS(pPeriod,pSocket,pEnable)
+	return tmpDS{
+		tmpDS.socketConfig.enableTls: pEnable,
+		tmpDS.socketConfig.caPath: pCapath,
+		tmpDS.socketConfig.certPath: pCertpath,
+		tmpDS.socketConfig.keyPath: pKeypath,
 	}
-	if bt.socketConfig.enableTls {
-		client, err = docker.NewTLSClient(
-			bt.socketConfig.socket,
-			bt.socketConfig.certPath,
-			bt.socketConfig.keyPath,
-			bt.socketConfig.caPath,
-		)
-	} else {*/
-	client, err = docker.NewClient(bt.socketConfig.socket)
-
-	return client, err
 }
-
+*/
 func (bt *DockerStats) InitDockerCLient() error{
+	logp.Info("Je suis à : InitDockerCLient ")
 	var clientErr error
 	var err error
-	bt.period = 10
-	bt.socketConfig = SocketConfig{
-		socket:    "unix:///var/run/docker.sock",
-	}
+
 	bt.dockerClient, clientErr = bt.GetDockerClient()
 	bt.dataGenerator = DataGenerator{
 		Socket: & bt.socketConfig.socket,
 		CalculatorFactory: calculator.CalculatorFactoryImpl{},
 		Period:    bt.period,
 	}
+	if clientErr != nil {
+		err = errors.New(fmt.Sprintf(" Unable to create dockerCLient"))
+	}
 
-
-	 if clientErr != nil {
-		 err = errors.New(fmt.Sprintf(" Unable to create dockerCLient"))
-	 }
 	return err
 }
+func (bt *DockerStats) GetDockerClient() (*docker.Client, error) {
+	logp.Info("Je suis à :GetDockerClient ")
+	var client *docker.Client
+	var err error
+	if bt.socketConfig.enableTls ==true{
+		client, err = docker.NewTLSClient(
+			bt.socketConfig.socket,
+			bt.socketConfig.certPath,
+			bt.socketConfig.keyPath,
+			bt.socketConfig.caPath,
+		)
+	}else {
+		client, err = docker.NewClient(bt.socketConfig.socket)
+
+	}
+	return client, err
+}
 func (d *DockerStats) GetDockerStats() ([]common.MapStr) {
+	logp.Info("Je suis à : GetDockerStats")
+	/*fmt.Printf(" ",d.period)
+	fmt.Printf("socket : ",d.socketConfig.socket)
+	fmt.Printf("enable : ",d.socketConfig.enableTls)
+	*/
 	d.InitDockerCLient()
 	logp.Info("DockerSTat is running")
+	//ticker := time.NewTicker(d.period)
+	//defer ticker.Stop()
 
-	timerStart := time.Now()
-	myStats ,_:= d.FetchSTats()
-	timerEnd := time.Now()
+	//for {
+		/*select {
+		//case <-bt.done:
+		//	return nil
+		case <-ticker.C:
+		}*/
+		//timerStart := time.Now()
+		myStats, _ := d.FetchSTats()
+		//
+	// timerEnd := time.Now()
+		if myStats != nil {
+			logp.Info(" Great, stats are available! \n")
+			logp.Info(" Data: %v", myStats)
+			//duration := (timerEnd.Sub(timerStart) * time.Second)
 
-	if myStats != nil {
-		logp.Info(" Great, stats are available! \n")
-		logp.Info(" Data: %v", myStats)
-		return myStats
-	}
-	duration := timerEnd.Sub(timerStart)
-	logp.Info(" Duration is : %d",duration)
-	logp.Info("Oups, No stats available ")
-	return nil
+			return myStats
+		}
+
+		logp.Info("Oups, No stats available ")
+		return nil
+	//}
+
 }
 func (d *DockerStats) FetchSTats() ([]common.MapStr, error ){
 	containers, err := d.dockerClient.ListContainers(docker.ListContainersOptions{})
@@ -106,38 +141,40 @@ func (d *DockerStats) FetchSTats() ([]common.MapStr, error ){
 func (d *DockerStats) ExportContainerStats(container docker.APIContainers) common.MapStr  {
 	// statsOptions creation
 	statsC := make(chan *docker.Stats)
-	done := make(chan bool)
+	//done := make(chan bool)
 	errC := make(chan error, 1)
+	var wg sync.WaitGroup
 	events := common.MapStr{}
 	// the stream bool is set to false to only listen the first stats
 	statsOptions := docker.StatsOptions{
 		ID:      container.ID,
 		Stats:   statsC,
 		Stream:  false,
-		Done:    done,
 		Timeout: -1,
 	}
+	wg.Add(2)
 	// goroutine to listen to the stats
 	go func() {
+		defer wg.Done()
 		errC <- d.dockerClient.Stats(statsOptions)
 		close(errC)
 	}()
 	// goroutine to get the stats & publish it
-	//go func() {
+	go func() {
+		defer wg.Done()
 		stats := <-statsC
 		err := <-errC
 
 		if err == nil && stats != nil {
 			events = d.dataGenerator.GetCpuData(&container, stats)
-			//d.events.PublishEvents(events)
 		} else if err == nil && stats == nil {
 			logp.Warn("Container was existing at listing but not when getting statistics: %v", container.ID)
-			//d.publishLogEvent(WARN, fmt.Sprintf("Container was existing at listing but not when getting statistics: %v", container.ID))
+
 		} else {
 			logp.Err("An error occurred while getting docker stats: %v", err)
-			//d.publishLogEvent(ERROR, fmt.Sprintf("An error occurred while getting docker stats: %v", err))
-		}
-	//}()
 
+		}
+	}()
+	wg.Wait()
 	return events
 }
