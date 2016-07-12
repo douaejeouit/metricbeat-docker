@@ -1,6 +1,7 @@
 .idea
 # Directories
 build
+metricbeat-docker
 ### Go template
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
