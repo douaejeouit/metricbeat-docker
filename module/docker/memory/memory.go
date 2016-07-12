@@ -1,18 +1,15 @@
-package cpu
+package memory
 
 import (
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/ingensi/metricbeat-docker/module/docker"
-	//"time"
-	"fmt"
-
 )
 
 // init registers the MetricSet with the central registry.
 // The New method will be called after the setup of the module and before starting to fetch data
 func init() {
-	if err := mb.Registry.AddMetricSet("docker", "cpu", New); err != nil {
+	if err := mb.Registry.AddMetricSet("docker", "memory", New); err != nil {
 		panic(err)
 	}
 }
@@ -30,11 +27,8 @@ type MetricSet struct {
 // Part of new is also setting up the configuration by processing additional
 // configuration entries if needed.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	fmt.Printf("HI there : new method")
-
 	config := docker.GetDefaultConf()
 
-	//config:= docker.Conf()
 	if err := base.Module().UnpackConfig(&config); err != nil {
 		return nil, err
 	}
@@ -42,17 +36,6 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 		BaseMetricSet: base,
 		ds : docker.CreateDS(config.Socket, config.Tls.Enable),
 	}, nil
-	/*if config.enableTls == false {
-		return &MetricSet{
-			BaseMetricSet: base,
-			ds : docker.CreateDS(config.Period, config.Socket, config.enableTls),
-		}, nil
-	} else {
-		return &MetricSet{
-			BaseMetricSet: base,
-			ds: docker.CreateDSE(config.Period, config.Socket, config.enableTls, config.CaPath,config.CertPath,config.KeyPath),
-		}, nil
-	}*/
 }
 
 // Fetch methods implements the data gathering and data conversion to the right format
@@ -60,6 +43,6 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 // descriptive error must be returned.
 func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 
-	events := m.ds.GetDockerStats("cpu")
+	events := m.ds.GetDockerStats("memory")
 	return events, nil
 }

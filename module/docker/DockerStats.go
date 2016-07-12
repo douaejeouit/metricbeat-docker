@@ -2,16 +2,15 @@ package docker
 
 import (
 	"errors"
-	"time"
+	//"time"
 	"fmt"
 	"sync"
 	"github.com/fsouza/go-dockerclient"
-	"github.com/ingensi/metricbeat-docker/calculator"
+	"github.com/ingensi/metricbeat-docker/module/docker/calculator"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
 
 )
-//var BeatConfig *config.Config
 
 type SocketConfig struct {
 	socket    string
@@ -21,18 +20,17 @@ type SocketConfig struct {
 	keyPath   string
 }
 
-// check docker config ??
 type DockerStats struct {
-	period               time.Duration
 	socketConfig         SocketConfig
 	dockerClient         *docker.Client
 	dataGenerator         DataGenerator
 }
 
+
+
 // if tls diseable
- func  CreateDS(pPeriod time.Duration, pSocket string, pEnable bool) *DockerStats {
+ func  CreateDS( pSocket string, pEnable bool) *DockerStats {
 	 return &DockerStats{
-		 period: pPeriod,
 		 socketConfig: SocketConfig{
 			 socket: pSocket,
 			 enableTls: pEnable,
@@ -54,7 +52,7 @@ type DockerStats struct {
 }
 */
 func (bt *DockerStats) InitDockerCLient() error{
-	logp.Info("Je suis à : InitDockerCLient ")
+	//logp.Info("Je suis à : InitDockerCLient ")
 	var clientErr error
 	var err error
 
@@ -62,16 +60,15 @@ func (bt *DockerStats) InitDockerCLient() error{
 	bt.dataGenerator = DataGenerator{
 		Socket: & bt.socketConfig.socket,
 		CalculatorFactory: calculator.CalculatorFactoryImpl{},
-		Period:    bt.period,
 	}
 	if clientErr != nil {
 		err = errors.New(fmt.Sprintf(" Unable to create dockerCLient"))
 	}
-
 	return err
 }
+
 func (bt *DockerStats) GetDockerClient() (*docker.Client, error) {
-	logp.Info("Je suis à :GetDockerClient ")
+	//logp.Info("Je suis à :GetDockerClient ")
 	var client *docker.Client
 	var err error
 	if bt.socketConfig.enableTls ==true{
@@ -87,27 +84,16 @@ func (bt *DockerStats) GetDockerClient() (*docker.Client, error) {
 	}
 	return client, err
 }
-func (d *DockerStats) GetDockerStats() ([]common.MapStr) {
-	logp.Info("Je suis à : GetDockerStats")
-	/*fmt.Printf(" ",d.period)
-	fmt.Printf("socket : ",d.socketConfig.socket)
-	fmt.Printf("enable : ",d.socketConfig.enableTls)
-	*/
-	d.InitDockerCLient()
-	logp.Info("DockerSTat is running")
-	//ticker := time.NewTicker(d.period)
-	//defer ticker.Stop()
+func (ds *DockerStats) GetDockerStats(metricSetName string) ([]common.MapStr) {
 
-	//for {
-		/*select {
-		//case <-bt.done:
-		//	return nil
-		case <-ticker.C:
-		}*/
-		//timerStart := time.Now()
-		myStats, _ := d.FetchSTats()
-		//
-	// timerEnd := time.Now()
+	logp.Info("Je suis à : GetDockerStats")
+	/*fmt.Printf(" ",ds.period)
+	fmt.Printf("socket : ",ds.socketConfig.socket)
+	fmt.Printf("enable : ",ds.socketConfig.enableTls)*/
+	ds.InitDockerCLient()
+	logp.Info("DockerSTat is running")
+
+		myStats, _ := ds.FetchSTats(metricSetName)
 		if myStats != nil {
 			logp.Info(" Great, stats are available! \n")
 			logp.Info(" Data: %v", myStats)
@@ -115,35 +101,29 @@ func (d *DockerStats) GetDockerStats() ([]common.MapStr) {
 
 			return myStats
 		}
-
-		logp.Info("Oups, No stats available ")
-		return nil
-	//}
-
+	return nil
 }
-func (d *DockerStats) FetchSTats() ([]common.MapStr, error ){
+func (d *DockerStats) FetchSTats(metricSetName string) ([]common.MapStr, error ){
 	containers, err := d.dockerClient.ListContainers(docker.ListContainersOptions{})
 
 	myEvents := []common.MapStr{}
 	if err == nil {
 		//export stats for each container
 		for _, container := range containers {
-			myEvents = append(myEvents, d.ExportContainerStats(container))
+			myEvents = append(myEvents, d.ExportContainerStats(container, metricSetName))
 		}
 	} else {
 		logp.Err("Cannot get container list: %v", err)
 	}
 
-	//d.dataGenerator.CleanOldStats(containers)
-
 	return myEvents, err
 }
-func (d *DockerStats) ExportContainerStats(container docker.APIContainers) common.MapStr  {
+func (d *DockerStats) ExportContainerStats(container docker.APIContainers, metricSetName string) common.MapStr  {
 	// statsOptions creation
-	statsC := make(chan *docker.Stats)
-	//done := make(chan bool)
-	errC := make(chan error, 1)
 	var wg sync.WaitGroup
+	statsC := make(chan *docker.Stats)
+	errC := make(chan error, 1)
+
 	events := common.MapStr{}
 	// the stream bool is set to false to only listen the first stats
 	statsOptions := docker.StatsOptions{
@@ -166,7 +146,12 @@ func (d *DockerStats) ExportContainerStats(container docker.APIContainers) commo
 		err := <-errC
 
 		if err == nil && stats != nil {
-			events = d.dataGenerator.GetCpuData(&container, stats)
+			if metricSetName == "cpu" {
+				events = d.dataGenerator.GetCpuData(&container, stats)
+			}
+			if metricSetName == "memory"{
+				events = d.dataGenerator.GetMemoryData(&container, stats)
+			}
 		} else if err == nil && stats == nil {
 			logp.Warn("Container was existing at listing but not when getting statistics: %v", container.ID)
 

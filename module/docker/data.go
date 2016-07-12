@@ -2,7 +2,7 @@ package docker
 
 import (
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/ingensi/metricbeat-docker/calculator"
+        "github.com/ingensi/metricbeat-docker/module/docker/calculator"
 	"github.com/fsouza/go-dockerclient"
 	"strings"
 	"time"
@@ -35,7 +35,7 @@ func (d *DataGenerator) GetCpuData(container *docker.APIContainers, stats *docke
 		"containerID":     container.ID,
 		"containerName":   d.extractContainerName(container.Names),
 		"containerLabels": d.buildLabelArray(container.Labels),
-		"dockerSocket":    d.Socket,
+		"i":    d.Socket,
 		"cpu": common.MapStr{
 			"percpuUsage":       calculator.PerCpuUsage(),
 			"totalUsage":        calculator.TotalUsage(),
@@ -45,6 +45,31 @@ func (d *DataGenerator) GetCpuData(container *docker.APIContainers, stats *docke
 	}
 	return event
 }
+
+
+
+func (d *DataGenerator) GetMemoryData(container *docker.APIContainers, stats *docker.Stats) common.MapStr {
+	event := common.MapStr{
+		"@timestamp":      common.Time(stats.Read),
+		"type":            "memory",
+		"containerID":     container.ID,
+		"containerName":   d.extractContainerName(container.Names),
+		"containerLabels": d.buildLabelArray(container.Labels),
+		"dockerSocket":    d.Socket,
+		"memory": common.MapStr{
+			"failcnt":    stats.MemoryStats.Failcnt,
+			"limit":      stats.MemoryStats.Limit,
+			"maxUsage":   stats.MemoryStats.MaxUsage,
+			"totalRss":   stats.MemoryStats.Stats.TotalRss,
+			"totalRss_p": float64(stats.MemoryStats.Stats.TotalRss) / float64(stats.MemoryStats.Limit),
+			"usage":      stats.MemoryStats.Usage,
+			"usage_p":    float64(stats.MemoryStats.Usage) / float64(stats.MemoryStats.Limit),
+		},
+	}
+
+	return event
+}
+
 
 
 func (d *DataGenerator) extractContainerName(names []string) string {
